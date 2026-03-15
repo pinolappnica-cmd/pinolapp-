@@ -1,7 +1,18 @@
+"use client";
 import Link from "next/link";
-import "../../client/styles/globals.css"; // reutilizamos estilos globales
+import "../../client/styles/globals.css";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [userEmail, setUserEmail] = useState("admin@pinolapp.com"); // aquí podrías leer del token
+  const router = useRouter();
+
+  const handleLogout = () => {
+    document.cookie = "token=; Max-Age=0; path=/"; // limpia cookie
+    router.push("/login");
+  };
+
   return (
     <html lang="es">
       <body className="flex min-h-screen">
@@ -28,9 +39,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 bg-gray-100 p-6">
-          {children}
-        </main>
+        <div className="flex-1 flex flex-col">
+          {/* Navbar superior */}
+          <header className="bg-white shadow px-6 py-3 flex justify-between items-center">
+            <span className="font-semibold">Usuario: {userEmail}</span>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+            >
+              Logout
+            </button>
+          </header>
+
+          <main className="flex-1 bg-gray-100 p-6">{children}</main>
+        </div>
       </body>
     </html>
   );
