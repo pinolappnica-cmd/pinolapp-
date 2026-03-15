@@ -1,13 +1,12 @@
-# PinolApp Nica Delivery
+# 🚚 PinolApp Nica Delivery
 
-Plataforma de delivery desarrollada con **Next.js**, **TypeScript**, **Prisma** y desplegada en **Railway**.
+Plataforma de delivery construida con **Next.js**, **TypeScript**, **Prisma**, y desplegada en **Railway**. Pensada para escalar, operar en producción y reflejar flujos reales de negocio.
 
 ---
 
-## 🚀 Instalación
-
-Clona el repositorio:
+## 🔧 Instalación
 
 ```bash
 git clone https://github.com/pinolapp/pinolapp.git
 cd pinolapp
+npm install
