@@ -1,12 +1,31 @@
 "use client";
 import Link from "next/link";
 import "../../client/styles/globals.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import jwt from "jsonwebtoken";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [userEmail, setUserEmail] = useState("admin@pinolapp.com"); // aquí podrías leer del token
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    // Leer cookie "token"
+    const cookie = document.cookie.split("; ").find((c) => c.startsWith("token="));
+    if (cookie) {
+      const token = cookie.split("=")[1];
+      try {
+        const decoded = jwt.decode(token) as { id: number; role: string; email?: string };
+        if (decoded && decoded.email) {
+          setUserEmail(decoded.email);
+        } else {
+          setUserEmail("admin@pinolapp.com");
+        }
+      } catch {
+        setUserEmail("admin@pinolapp.com");
+      }
+    }
+  }, []);
 
   const handleLogout = () => {
     document.cookie = "token=; Max-Age=0; path=/"; // limpia cookie
@@ -42,7 +61,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex-1 flex flex-col">
           {/* Navbar superior */}
           <header className="bg-white shadow px-6 py-3 flex justify-between items-center">
-            <span className="font-semibold">Usuario: {userEmail}</span>
+            <span className="font-semibold">
+              Usuario: {userEmail ? userEmail : "Cargando..."}
+            </span>
             <button
               onClick={handleLogout}
               className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
