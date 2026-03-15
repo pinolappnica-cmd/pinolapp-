@@ -1,61 +1,53 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../lib/prisma";
+import type { NextApiRequest, NextApiResponse } from "next";
+import prisma from "../../lib/prisma";
 
-export async function GET(req: Request) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const userId = new URL(req.url).searchParams.get("userId");
-    if (!userId) {
-      return NextResponse.json({ error: "Falta userId" }, { status: 400 });
-    }
+    const { customerId, restaurantId } = req.query;
 
-    const orders = await prisma.order.findMany({
-      where: { userId: Number(userId) },
-      include: { items: true, driver: true },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return NextResponse.json(orders);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al obtener órdenes" }, { status: 500 });
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { userId, items, deliveryAddress, deliveryLat, deliveryLng } = await req.json();
-    if (!userId || !items || items.length === 0) {
-      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
-    }
-
-    const order = await prisma.order.create({
-      data: {
-        userId,
-        deliveryAddress,
-        deliveryLat,
-        deliveryLng,
-        status: "pending",
-        items: {
-          create: items.map((item: any) => ({
-            menuItemId: item.id,
-            quantity: item.quantity,
-          })),
+    // Si no se pasa ningún filtro, devolvemos todas las órdenes
+    if (!customerId && !restaurantId) {
+      const orders = await prisma.order.findMany({
+        orderBy: { id: "desc" },
+        include: {
+          customer: true,
+          restaurant: true,
+          payments: true,
+          notifications: true,
         },
-      },
-      include: { items: true },
-    });
-
-    return NextResponse.json(order);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al crear orden" }, { status: 500 });
-  }
-}
-
-export async function PUT(req: Request) {
-  try {
-    const { orderId, status, driverId } = await req.json();
-    if (!orderId || !status) {
-      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+      });
+      return res.status(200).json(orders);
     }
 
-    const order = await prisma.order.update({
-      where: { id
+    // Filtrar por cliente
+    if (customerId) {
+      const orders = await prisma.order.findMany({
+        where: { customerId: Number(customerId) },
+        orderBy: { id: "desc" },
+        include: {
+          restaurant: true,
+          payments: true,
+          notifications: true,
+        },
+      });
+      return res.status(200).json(orders);
+    }
+
+    // Filtrar por restaurante
+    if (restaurantId) {
+      const orders = await prisma.order.findMany({
+        where: { restaurantId: Number(restaurantId) },
+        orderBy: { id: "desc" },
+        include: {
+          customer: true,
+          payments: true,
+          notifications: true,
+        },
+      });
+      return res.status(200).json(orders);
+    }
+  } catch (error) {
+    console.error("Error en /api/orders:", error);
+    return res.status(500).json({ error: "Error al obtener órdenes" });
+  }
+}
