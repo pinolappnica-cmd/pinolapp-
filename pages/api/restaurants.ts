@@ -1,30 +1,27 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../lib/prisma";
+import type { NextApiRequest, NextApiResponse } from "next";
+import prisma from "../../lib/prisma";
 
-export async function GET() {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const restaurants = await prisma.restaurant.findMany({
-      include: { menu: true },
-    });
-    return NextResponse.json(restaurants);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al obtener restaurantes" }, { status: 500 });
-  }
-}
+    const { categoryId } = req.query;
 
-export async function POST(req: Request) {
-  try {
-    const { name, category, address } = await req.json();
-    if (!name || !category || !address) {
-      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+    // Si no se pasa categoryId, devolvemos todos los restaurantes
+    if (!categoryId) {
+      const restaurants = await prisma.restaurant.findMany({
+        orderBy: { id: "asc" },
+      });
+      return res.status(200).json(restaurants);
     }
 
-    const restaurant = await prisma.restaurant.create({
-      data: { name, category, address },
+    // Si se pasa categoryId, filtramos por categoría
+    const restaurants = await prisma.restaurant.findMany({
+      where: { categoryId: Number(categoryId) },
+      orderBy: { id: "asc" },
     });
 
-    return NextResponse.json(restaurant);
+    return res.status(200).json(restaurants);
   } catch (error) {
-    return NextResponse.json({ error: "Error al crear restaurante" }, { status: 500 });
+    console.error("Error en /api/restaurants:", error);
+    return res.status(500).json({ error: "Error al obtener restaurantes" });
   }
 }
