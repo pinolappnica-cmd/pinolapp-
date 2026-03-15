@@ -1,36 +1,29 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../lib/prisma";
+import type { NextApiRequest, NextApiResponse } from "next";
+import prisma from "../../lib/prisma";
 
-export async function GET(req: Request) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const restaurantId = new URL(req.url).searchParams.get("restaurantId");
+    const { restaurantId } = req.query;
+
+    // Si no se pasa restaurantId, devolvemos todos los platillos
     if (!restaurantId) {
-      return NextResponse.json({ error: "Falta restaurantId" }, { status: 400 });
+      const menuItems = await prisma.menuItem.findMany({
+        orderBy: { id: "asc" },
+        include: { restaurant: true },
+      });
+      return res.status(200).json(menuItems);
     }
 
-    const items = await prisma.menuItem.findMany({
+    // Si se pasa restaurantId, filtramos por restaurante
+    const menuItems = await prisma.menuItem.findMany({
       where: { restaurantId: Number(restaurantId) },
+      orderBy: { id: "asc" },
+      include: { restaurant: true },
     });
 
-    return NextResponse.json(items);
+    return res.status(200).json(menuItems);
   } catch (error) {
-    return NextResponse.json({ error: "Error al obtener menú" }, { status: 500 });
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { restaurantId, name, price } = await req.json();
-    if (!restaurantId || !name || !price) {
-      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
-    }
-
-    const item = await prisma.menuItem.create({
-      data: { restaurantId, name, price },
-    });
-
-    return NextResponse.json(item);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al crear ítem de menú" }, { status: 500 });
+    console.error("Error en /api/menu:", error);
+    return res.status(500).json({ error: "Error al obtener menú" });
   }
 }
