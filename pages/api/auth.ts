@@ -1,38 +1,65 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../lib/prisma";
-import { signToken } from "../../lib/auth";
+import type { NextApiRequest, NextApiResponse } from "next";
+import prisma from "../../lib/prisma";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
-export async function POST(req: Request) {
-  const { email, password, role, action } = await req.json();
+const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
-  if (action === "register") {
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return NextResponse.json({ error: "Usuario ya existe" }, { status: 400 });
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    if (req.method === "POST") {
+      const { action, email, password, name } = req.body;
+
+      if (!action || !email || !password) {
+        return res.status(400).json({ error: "Faltan campos obligatorios" });
+      }
+
+      // Registro de cliente
+      if (action === "register") {
+        const existing = await prisma.customer.findUnique({ where: { email } });
+        if (existing) {
+          return res.status(400).json({ error: "El email ya está registrado" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const customer = await prisma.customer.create({
+          data: {
+            name: name || "Usuario",
+            email,
+            password: hashedPassword,
+            phone: "",
+            address: "",
+          },
+        });
+
+        return res.status(201).json({ message: "Registro exitoso", customer });
+      }
+
+      // Login de cliente
+      if (action === "login") {
+        const customer = await prisma.customer.findUnique({ where: { email } });
+        if (!customer) {
+          return res.status(404).json({ error: "Cliente no encontrado" });
+        }
+
+        const valid = await bcrypt.compare(password, customer.password);
+        if (!valid) {
+          return res.status(401).json({ error: "Credenciales inválidas" });
+        }
+
+        const token = jwt.sign({ id: customer.id, email: customer.email }, JWT_SECRET, {
+          expiresIn: "7d",
+        });
+
+        return res.status(200).json({ message: "Login exitoso", token, customer });
+      }
+
+      return res.status(400).json({ error: "Acción inválida" });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: { email, password: hashed, role: role || "customer" },
-    });
-
-    return NextResponse.json({ message: "Usuario registrado", user });
+    return res.status(405).json({ error: "Método no permitido" });
+  } catch (error) {
+    console.error("Error en /api/auth:", error);
+    return res.status(500).json({ error: "Error en autenticación" });
   }
-
-  if (action === "login") {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
-
-    const token = signToken({ id: user.id, role: user.role, email: user.email });
-
-    const res = NextResponse.json({ message: "Login exitoso", user });
-    res.cookies.set("token", token, { httpOnly: true, path: "/" });
-    return res;
-  }
-
-  return NextResponse.json({ error: "Acción inválida" }, { status: 400 });
 }
