@@ -3,22 +3,32 @@ import prisma from "../../lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { customerId } = req.query;
+    const { id } = req.query;
 
-    // Validación
-    if (!customerId) {
-      return res.status(400).json({ error: "Falta el parámetro customerId" });
+    // Si no se pasa id, devolvemos todos los clientes
+    if (!id) {
+      const customers = await prisma.customer.findMany({
+        orderBy: { id: "asc" },
+      });
+      return res.status(200).json(customers);
     }
 
-    // Obtener notificaciones del cliente
-    const notifications = await prisma.notification.findMany({
-      where: { customerId: Number(customerId) },
-      orderBy: { id: "desc" },
+    // Si se pasa id, devolvemos el perfil del cliente
+    const customer = await prisma.customer.findUnique({
+      where: { id: Number(id) },
+      include: {
+        orders: true, // historial de pedidos
+        notifications: true, // notificaciones asociadas
+      },
     });
 
-    return res.status(200).json(notifications);
+    if (!customer) {
+      return res.status(404).json({ error: "Cliente no encontrado" });
+    }
+
+    return res.status(200).json(customer);
   } catch (error) {
-    console.error("Error en /api/notifications:", error);
-    return res.status(500).json({ error: "Error al obtener notificaciones" });
+    console.error("Error en /api/customers:", error);
+    return res.status(500).json({ error: "Error al obtener clientes" });
   }
 }
