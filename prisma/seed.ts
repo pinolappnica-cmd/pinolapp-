@@ -1,84 +1,130 @@
-import { prisma } from "../database/prisma";
-import { faker } from "@faker-js/faker";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding database...");
-
-  await prisma.orderItem.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.menuItem.deleteMany();
-  await prisma.restaurant.deleteMany();
-  await prisma.driver.deleteMany();
-  await prisma.user.deleteMany();
-
-  const admin = await prisma.user.create({
-    data: { email: "admin@pinolapp.com", password: "hashed", role: "admin" },
+  // Categorías
+  await prisma.category.createMany({
+    data: [
+      { name: "Restaurantes", icon: "/icons/restaurant.png" },
+      { name: "Comida rápida", icon: "/icons/fast.png" },
+      { name: "Farmacias", icon: "/icons/farmacia.png" },
+      { name: "Mercados", icon: "/icons/market.png" },
+    ],
   });
 
-  const drivers = await Promise.all(
-    Array.from({ length: 3 }).map(async () => {
-      const user = await prisma.user.create({
-        data: { email: faker.internet.email(), password: "hashed", role: "driver" },
-      });
-      return prisma.driver.create({ data: { userId: user.id, phone: faker.phone.number() } });
-    })
-  );
-
-  const customers = await Promise.all(
-    Array.from({ length: 5 }).map(() =>
-      prisma.user.create({
-        data: { email: faker.internet.email(), password: "hashed", role: "customer" },
-      })
-    )
-  );
-
-  const restaurants = await Promise.all(
-    Array.from({ length: 5 }).map(() =>
-      prisma.restaurant.create({
-        data: {
-          name: faker.company.name(),
-          category: faker.commerce.department(),
-          address: faker.location.streetAddress(),
-          phone: faker.phone.number(),
-          menuItems: {
-            create: Array.from({ length: 4 }).map(() => ({
-              name: faker.commerce.productName(),
-              price: parseFloat(faker.commerce.price({ min: 3, max: 20 })),
-            })),
-          },
-        },
-        include: { menuItems: true },
-      })
-    )
-  );
-
-  for (let i = 0; i < 10; i++) {
-    const customer = customers[Math.floor(Math.random() * customers.length)];
-    const restaurant = restaurants[Math.floor(Math.random() * restaurants.length)];
-    const driver = drivers[Math.floor(Math.random() * drivers.length)];
-    const status = ["pending", "preparing", "delivering", "delivered"][Math.floor(Math.random() * 4)];
-
-    await prisma.order.create({
-      data: {
-        userId: customer.id,
-        status,
-        driverId: status !== "pending" ? driver.id : null,
-        deliveryAddress: faker.location.streetAddress(),
-        deliveryLat: parseFloat(faker.location.latitude()),
-        deliveryLng: parseFloat(faker.location.longitude()),
-        items: {
-          create: [
-            {
-              menuItemId: restaurant.menuItems[0].id,
-              quantity: 2,
-            },
-          ],
-        },
+  // Clientes
+  await prisma.customer.createMany({
+    data: [
+      {
+        name: "Carlos López",
+        email: "carlos@example.com",
+        phone: "+50588889999",
+        address: "Managua, Colonia Centroamérica",
       },
-    });
-  }
+      {
+        name: "María Pérez",
+        email: "maria@example.com",
+        phone: "+50577778888",
+        address: "Granada, Calle Real",
+      },
+      {
+        name: "José Martínez",
+        email: "jose@example.com",
+        phone: "+50566667777",
+        address: "León, Barrio El Laborío",
+      },
+    ],
+  });
 
-  console.log("✅ Seed complete");
+  // Restaurantes
+  await prisma.restaurant.createMany({
+    data: [
+      {
+        name: "El Buen Sabor",
+        rating: 4.5,
+        deliveryTime: 25,
+        priceRange: "C$100 - C$550",
+      },
+      {
+        name: "Súper Típico",
+        rating: 4.2,
+        deliveryTime: 30,
+        priceRange: "C$80 - C$500",
+      },
+      {
+        name: "Pizza Express",
+        rating: 4.7,
+        deliveryTime: 20,
+        priceRange: "C$150 - C$600",
+      },
+    ],
+  });
+
+  // Órdenes
+  await prisma.order.createMany({
+    data: [
+      {
+        customerId: 1,
+        restaurantId: 1,
+        status: "EN_CAMINO",
+        total: 180,
+      },
+      {
+        customerId: 2,
+        restaurantId: 2,
+        status: "PREPARANDO",
+        total: 250,
+      },
+    ],
+  });
+
+  // Pagos
+  await prisma.payment.createMany({
+    data: [
+      {
+        orderId: 1,
+        amount: 180,
+        status: "CONFIRMADO",
+        method: "Tarjeta",
+        transactionId: "pi_123456789",
+      },
+      {
+        orderId: 2,
+        amount: 250,
+        status: "PENDIENTE",
+        method: "Tarjeta",
+        transactionId: "pi_987654321",
+      },
+    ],
+  });
+
+  // Notificaciones
+  await prisma.notification.createMany({
+    data: [
+      {
+        customerId: 1,
+        message: "Tu pedido está en camino 🚚",
+        type: "PUSH",
+        status: "ENVIADO",
+      },
+      {
+        customerId: 2,
+        message: "Tu pago está pendiente de confirmación 💳",
+        type: "EMAIL",
+        status: "ENVIADO",
+      },
+    ],
+  });
+
+  console.log("✅ Seed completado con categorías, clientes, restaurantes, órdenes, pagos y notificaciones.");
 }
 
-main().finally(() => prisma.$disconnect());
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
