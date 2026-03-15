@@ -1,59 +1,27 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../lib/prisma";
+import type { NextApiRequest, NextApiResponse } from "next";
+import prisma from "../../lib/prisma";
 
-export async function GET(req: Request) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const driverId = new URL(req.url).searchParams.get("id");
+    const { available } = req.query;
 
-    if (driverId) {
-      const driver = await prisma.driver.findUnique({
-        where: { id: Number(driverId) },
-        include: { user: true },
+    // Si no se pasa filtro, devolvemos todos los repartidores
+    if (!available) {
+      const drivers = await prisma.driver.findMany({
+        orderBy: { id: "asc" },
       });
-      if (!driver) {
-        return NextResponse.json({ error: "Driver no encontrado" }, { status: 404 });
-      }
-      return NextResponse.json(driver);
+      return res.status(200).json(drivers);
     }
 
-    const drivers = await prisma.driver.findMany({ include: { user: true } });
-    return NextResponse.json(drivers);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al obtener drivers" }, { status: 500 });
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { userId, phone, lat, lng } = await req.json();
-    if (!userId || !phone) {
-      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
-    }
-
-    const driver = await prisma.driver.create({
-      data: { userId, phone, lat, lng },
+    // Filtrar por disponibilidad
+    const drivers = await prisma.driver.findMany({
+      where: { available: available === "true" },
+      orderBy: { id: "asc" },
     });
 
-    return NextResponse.json(driver);
+    return res.status(200).json(drivers);
   } catch (error) {
-    return NextResponse.json({ error: "Error al crear driver" }, { status: 500 });
-  }
-}
-
-export async function PUT(req: Request) {
-  try {
-    const { id, lat, lng } = await req.json();
-    if (!id || lat === undefined || lng === undefined) {
-      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
-    }
-
-    const driver = await prisma.driver.update({
-      where: { id },
-      data: { lat, lng },
-    });
-
-    return NextResponse.json(driver);
-  } catch (error) {
-    return NextResponse.json({ error: "Error al actualizar ubicación del driver" }, { status: 500 });
+    console.error("Error en /api/drivers:", error);
+    return res.status(500).json({ error: "Error al obtener repartidores" });
   }
 }
